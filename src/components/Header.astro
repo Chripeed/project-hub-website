@@ -6,7 +6,7 @@ import type { Link } from "../types";
 interface Props {
   logoUrl: string;
   logoAlt: string;
-  links: Link[];
+  links?: Link[];
   link1?: Link;
   link2?: Link;
 }
@@ -26,7 +26,7 @@ const { logoUrl, logoAlt, link1, link2, links } = Astro.props;
         <div class="menu">
           <ul>
             {
-              links.map((l) => (
+              links?.map((l) => (
                 <li>
                   <a href={l.url}>{l.title}</a>
                 </li>
@@ -45,14 +45,14 @@ const { logoUrl, logoAlt, link1, link2, links } = Astro.props;
           }
           {link2 ? <Button {...link2} revealable={false} /> : null}
 
-          <button type="button" class="toggle" aria-label="">
+          <!-- <button type="button" class="toggle" aria-label="">
             <span class="u-sr-only">Toggle Mobile Menu</span>
             <span aria-hidden>
               <span></span>
               <span></span>
               <span></span>
             </span>
-          </button>
+          </button> -->
         </div>
       </div>
     </div>

@@ -1,0 +1,981 @@
+---
+
+---
+
+<sy-gl></sy-gl>
+
+<script>
+  import * as THREE from "three";
+
+  import gsap from "gsap";
+  import { addResizeObserver } from "../utils/observers";
+  import ScrollTrigger from "gsap/ScrollTrigger";
+
+  gsap.registerPlugin(ScrollTrigger);
+
+  const container = document.querySelector("sy-gl") as HTMLElement;
+
+  const scene = new THREE.Scene();
+  const frustumSize = 5;
+  let aspect = window.innerWidth / window.innerHeight;
+  const camera = new THREE.OrthographicCamera(
+    (-frustumSize * aspect) / 2,
+    (frustumSize * aspect) / 2,
+    frustumSize / 2,
+    -frustumSize / 2,
+    0,
+    20,
+  );
+
+  camera.position.set(0, 0, 10);
+  camera.lookAt(0, 0, 0);
+  camera.updateProjectionMatrix();
+
+  const renderer = new THREE.WebGLRenderer({
+    antialias: true,
+    alpha: true,
+  });
+  const canvas = renderer.domElement;
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  container.appendChild(canvas);
+
+  renderer.setClearColor("#ffffff");
+  renderer.setClearAlpha(0);
+
+  const globals = {
+    uTime: { value: 0 },
+    uVel: { value: 0 },
+  };
+
+  const ballGroup = new THREE.Group();
+  const coreGroup = new THREE.Group();
+  const orbitGroup = new THREE.Group();
+  const accentGroup = new THREE.Group();
+  scene.add(ballGroup);
+  ballGroup.add(coreGroup, orbitGroup, accentGroup);
+
+  const panelEntries: {
+    mesh: THREE.Mesh;
+    basePosition: THREE.Vector3;
+    baseRotation: THREE.Euler;
+    baseScale: THREE.Vector3;
+    phase: number;
+    speed: number;
+    amplitude: number;
+    active: boolean;
+  }[] = [];
+
+  const raycaster = new THREE.Raycaster();
+  const mouse = new THREE.Vector2();
+
+  const glassMat = (tint: string, opacity = 0.7) =>
+    new THREE.MeshPhysicalMaterial({
+      color: tint,
+      transparent: true,
+      opacity,
+      roughness: 0.12,
+      metalness: 0.05,
+      transmission: 0.35,
+      thickness: 0.35,
+      envMapIntensity: 0.8,
+      clearcoat: 1,
+      clearcoatRoughness: 0.08,
+      side: THREE.DoubleSide,
+    });
+
+  const darkPanelMat = new THREE.MeshPhysicalMaterial({
+    color: "#111827",
+    transparent: true,
+    opacity: 0.82,
+    roughness: 0.25,
+    metalness: 0.15,
+    transmission: 0.08,
+    thickness: 0.6,
+    clearcoat: 1,
+    clearcoatRoughness: 0.12,
+  });
+
+  const accentMat = new THREE.MeshBasicMaterial({
+    color: "#8b5cf6",
+    transparent: true,
+    opacity: 0.9,
+  });
+
+  const mintMat = new THREE.MeshBasicMaterial({
+    color: "#2dd4bf",
+    transparent: true,
+    opacity: 0.95,
+  });
+
+  const warmMat = new THREE.MeshBasicMaterial({
+    color: "#fb7185",
+    transparent: true,
+    opacity: 0.85,
+  });
+
+  const ambient = new THREE.AmbientLight("#ffffff", 1.8);
+  scene.add(ambient);
+
+  const keyLight = new THREE.DirectionalLight("#c4b5fd", 2.5);
+  keyLight.position.set(2, 3, 5);
+  scene.add(keyLight);
+
+  const rimLight = new THREE.DirectionalLight("#67e8f9", 1.8);
+  rimLight.position.set(-3, -2, 4);
+  scene.add(rimLight);
+
+  function addPanel(
+    parent: THREE.Object3D,
+    size: [number, number, number],
+    position: [number, number, number],
+    rotation: [number, number, number],
+    material: THREE.Material,
+    options: {
+      floating?: boolean;
+      phase?: number;
+      speed?: number;
+      amplitude?: number;
+    } = {},
+  ) {
+    const geom = new THREE.BoxGeometry(...size);
+    const mesh = new THREE.Mesh(geom, material);
+    mesh.position.set(...position);
+    mesh.rotation.set(...rotation);
+    parent.add(mesh);
+
+    panelEntries.push({
+      mesh,
+      basePosition: mesh.position.clone(),
+      baseRotation: mesh.rotation.clone(),
+      baseScale: mesh.scale.clone(),
+      phase: options.phase ?? Math.random() * Math.PI * 2,
+      speed: options.speed ?? 1,
+      amplitude: options.amplitude ?? 0,
+      active: false,
+    });
+
+    return mesh;
+  }
+
+  function addAccentBar(
+    parent: THREE.Object3D,
+    size: [number, number, number],
+    position: [number, number, number],
+    material: THREE.Material,
+  ) {
+    const mesh = new THREE.Mesh(new THREE.BoxGeometry(...size), material);
+    mesh.position.set(...position);
+    parent.add(mesh);
+    return mesh;
+  }
+
+  function addCircleBadge(
+    parent: THREE.Object3D,
+    radius: number,
+    position: [number, number, number],
+    material: THREE.Material,
+  ) {
+    const mesh = new THREE.Mesh(
+      new THREE.CylinderGeometry(radius, radius, 0.016, 28),
+      material,
+    );
+    mesh.rotation.x = Math.PI / 2;
+    mesh.position.set(...position);
+    parent.add(mesh);
+    return mesh;
+  }
+
+  function addDiamondBadge(
+    parent: THREE.Object3D,
+    size: number,
+    position: [number, number, number],
+    material: THREE.Material,
+  ) {
+    const mesh = new THREE.Mesh(
+      new THREE.BoxGeometry(size, size, 0.016),
+      material,
+    );
+    mesh.rotation.z = Math.PI / 4;
+    mesh.position.set(...position);
+    parent.add(mesh);
+    return mesh;
+  }
+
+  function addPlayBadge(
+    parent: THREE.Object3D,
+    width: number,
+    height: number,
+    position: [number, number, number],
+    material: THREE.Material,
+  ) {
+    const shape = new THREE.Shape();
+    shape.moveTo(-width * 0.5, -height * 0.5);
+    shape.lineTo(width * 0.5, 0);
+    shape.lineTo(-width * 0.5, height * 0.5);
+    shape.closePath();
+    const geom = new THREE.ExtrudeGeometry(shape, {
+      depth: 0.014,
+      bevelEnabled: false,
+    });
+    geom.center();
+    const mesh = new THREE.Mesh(geom, material);
+    mesh.position.set(...position);
+    parent.add(mesh);
+    return mesh;
+  }
+
+  function addPanelFeature(
+    panel: THREE.Mesh,
+    kind: string,
+    width: number,
+    height: number,
+    depth: number,
+  ) {
+    const frontZ = depth * 0.8;
+
+    if (kind === "readme" || kind === "miniReadme") {
+      addAccentBar(
+        panel,
+        [width * 0.16, 0.11, 0.014],
+        [-width * 0.28, 0.05, frontZ],
+        mintMat,
+      );
+      addAccentBar(
+        panel,
+        [width * 0.46, 0.02, 0.014],
+        [0.03, 0.08, frontZ],
+        accentMat,
+      );
+      addAccentBar(
+        panel,
+        [width * 0.38, 0.02, 0.014],
+        [0.0, 0.015, frontZ],
+        warmMat,
+      );
+      addAccentBar(
+        panel,
+        [width * 0.42, 0.02, 0.014],
+        [0.02, -0.05, frontZ],
+        mintMat,
+      );
+      addAccentBar(
+        panel,
+        [width * 0.26, 0.02, 0.014],
+        [-0.06, -0.115, frontZ],
+        accentMat,
+      );
+      if (kind === "miniReadme") {
+        addDiamondBadge(
+          panel,
+          0.06,
+          [width * 0.26, -height * 0.18, frontZ],
+          warmMat,
+        );
+      }
+      return;
+    }
+
+    if (kind === "git") {
+      const points = [
+        [-width * 0.24, 0.08, frontZ],
+        [0, 0.12, frontZ],
+        [width * 0.22, 0.0, frontZ],
+        [-0.02, -0.1, frontZ],
+      ] as [number, number, number][];
+      addAccentBar(
+        panel,
+        [width * 0.26, 0.016, 0.014],
+        [-width * 0.12, 0.1, frontZ],
+        accentMat,
+      ).rotation.z = 0.18;
+      addAccentBar(
+        panel,
+        [width * 0.32, 0.016, 0.014],
+        [width * 0.09, 0.05, frontZ],
+        mintMat,
+      ).rotation.z = -0.55;
+      addAccentBar(
+        panel,
+        [width * 0.22, 0.016, 0.014],
+        [-0.01, -0.02, frontZ],
+        warmMat,
+      ).rotation.z = -1.18;
+      points.forEach((pos, idx) =>
+        addCircleBadge(
+          panel,
+          0.034 + (idx === 1 ? 0.006 : 0),
+          pos,
+          idx % 2 === 0 ? accentMat : mintMat,
+        ),
+      );
+      return;
+    }
+
+    if (kind === "time") {
+      addCircleBadge(panel, height * 0.26, [0, 0.0, frontZ], accentMat);
+      addCircleBadge(
+        panel,
+        height * 0.18,
+        [0, 0.0, frontZ + 0.002],
+        darkPanelMat.clone(),
+      );
+      addAccentBar(
+        panel,
+        [0.016, height * 0.12, 0.014],
+        [0.0, 0.035, frontZ + 0.006],
+        mintMat,
+      );
+      const hand = addAccentBar(
+        panel,
+        [width * 0.12, 0.016, 0.014],
+        [0.035, -0.015, frontZ + 0.006],
+        warmMat,
+      );
+      hand.rotation.z = -0.72;
+      addCircleBadge(panel, 0.024, [0, 0.0, frontZ + 0.008], warmMat);
+      return;
+    }
+
+    if (kind === "favorite") {
+      const starPoints: [number, number][] = [];
+      const outer = height * 0.24;
+      const inner = outer * 0.48;
+      for (let i = 0; i < 10; i += 1) {
+        const r = i % 2 === 0 ? outer : inner;
+        const a = -Math.PI / 2 + (i * Math.PI) / 5;
+        starPoints.push([Math.cos(a) * r, Math.sin(a) * r]);
+      }
+      const shape = new THREE.Shape();
+      starPoints.forEach(([x, y], idx) => {
+        if (idx === 0) shape.moveTo(x, y);
+        else shape.lineTo(x, y);
+      });
+      shape.closePath();
+      const geom = new THREE.ExtrudeGeometry(shape, {
+        depth: 0.014,
+        bevelEnabled: false,
+      });
+      geom.center();
+      const mesh = new THREE.Mesh(geom, warmMat);
+      mesh.position.set(0, 0.01, frontZ);
+      panel.add(mesh);
+      addAccentBar(
+        panel,
+        [width * 0.4, 0.02, 0.014],
+        [0.0, -height * 0.22, frontZ],
+        accentMat,
+      );
+      return;
+    }
+
+    if (kind === "launch") {
+      addCircleBadge(panel, height * 0.28, [0, 0.0, frontZ], mintMat);
+      addCircleBadge(
+        panel,
+        height * 0.2,
+        [0, 0.0, frontZ + 0.002],
+        darkPanelMat.clone(),
+      );
+      addPlayBadge(
+        panel,
+        width * 0.18,
+        height * 0.22,
+        [0.03, 0.0, frontZ + 0.008],
+        accentMat,
+      );
+      addAccentBar(
+        panel,
+        [width * 0.42, 0.02, 0.014],
+        [0.0, -height * 0.24, frontZ],
+        warmMat,
+      );
+      return;
+    }
+  }
+
+  // central code core
+  const backCard = addPanel(
+    coreGroup,
+    [1.2, 0.82, 0.08],
+    [0, 0, -0.16],
+    [0.1, -0.28, 0.02],
+    glassMat("#c4b5fd", 0.42),
+  );
+
+  const middleCard = addPanel(
+    coreGroup,
+    [1.28, 0.9, 0.1],
+    [0.03, 0.02, -0.02],
+    [-0.02, 0.14, -0.03],
+    glassMat("#7dd3fc", 0.5),
+  );
+
+  const frontCard = addPanel(
+    coreGroup,
+    [1.08, 0.72, 0.12],
+    [0, 0.02, 0.16],
+    [-0.08, 0.26, 0.02],
+    darkPanelMat,
+  );
+
+  addAccentBar(coreGroup, [0.68, 0.04, 0.02], [0, 0.18, 0.24], accentMat);
+  addAccentBar(coreGroup, [0.54, 0.035, 0.02], [-0.06, 0.03, 0.24], mintMat);
+  addAccentBar(coreGroup, [0.36, 0.035, 0.02], [-0.15, -0.12, 0.24], warmMat);
+
+  // side tabs / file markers
+  const tabMatA = glassMat("#f9a8d4", 0.48);
+  const tabMatB = glassMat("#99f6e4", 0.42);
+  addPanel(
+    coreGroup,
+    [0.16, 0.36, 0.05],
+    [-0.72, 0.1, -0.02],
+    [0, 0.22, 0.08],
+    tabMatA,
+  );
+  addPanel(
+    coreGroup,
+    [0.14, 0.28, 0.05],
+    [0.72, -0.04, 0.05],
+    [0, -0.24, -0.06],
+    tabMatB,
+  );
+
+  // floating project panels around the core
+  const orbitConfigs: Array<{
+    kind: "readme" | "git" | "time" | "favorite" | "launch" | "miniReadme";
+    size: [number, number, number];
+    position: [number, number, number];
+    rotation: [number, number, number];
+    color: string;
+    opacity: number;
+    phase: number;
+    speed: number;
+    amplitude: number;
+  }> = [
+    {
+      kind: "readme",
+      size: [0.58, 0.36, 0.05],
+      position: [-1.05, 0.78, -0.08],
+      rotation: [0.22, 0.52, -0.28],
+      color: "#ddd6fe",
+      opacity: 0.42,
+      phase: 0.0,
+      speed: 1.0,
+      amplitude: 0.06,
+    },
+    {
+      kind: "git",
+      size: [0.64, 0.4, 0.05],
+      position: [1.02, 0.66, 0.06],
+      rotation: [-0.18, -0.45, 0.22],
+      color: "#bae6fd",
+      opacity: 0.38,
+      phase: 0.6,
+      speed: 1.2,
+      amplitude: 0.05,
+    },
+    {
+      kind: "time",
+      size: [0.52, 0.32, 0.05],
+      position: [-1.08, -0.7, 0.18],
+      rotation: [-0.2, 0.4, 0.12],
+      color: "#fbcfe8",
+      opacity: 0.36,
+      phase: 1.4,
+      speed: 0.95,
+      amplitude: 0.06,
+    },
+    {
+      kind: "favorite",
+      size: [0.62, 0.34, 0.05],
+      position: [1.1, -0.62, -0.12],
+      rotation: [0.16, -0.36, -0.18],
+      color: "#a7f3d0",
+      opacity: 0.34,
+      phase: 2.0,
+      speed: 1.1,
+      amplitude: 0.07,
+    },
+    {
+      kind: "launch",
+      size: [0.42, 0.26, 0.04],
+      position: [0.05, 1.06, -0.2],
+      rotation: [0.34, 0.04, 0.12],
+      color: "#e9d5ff",
+      opacity: 0.28,
+      phase: 2.8,
+      speed: 1.35,
+      amplitude: 0.05,
+    },
+    {
+      kind: "miniReadme",
+      size: [0.4, 0.24, 0.04],
+      position: [-0.12, -1.02, 0.06],
+      rotation: [-0.3, -0.12, -0.08],
+      color: "#bfdbfe",
+      opacity: 0.28,
+      phase: 3.3,
+      speed: 1.05,
+      amplitude: 0.05,
+    },
+  ];
+
+  orbitConfigs.forEach((cfg) => {
+    const panel = addPanel(
+      orbitGroup,
+      cfg.size,
+      cfg.position,
+      cfg.rotation,
+      glassMat(cfg.color, cfg.opacity),
+      {
+        floating: true,
+        phase: cfg.phase,
+        speed: cfg.speed,
+        amplitude: cfg.amplitude,
+      },
+    );
+
+    addPanelFeature(panel, cfg.kind, cfg.size[0], cfg.size[1], cfg.size[2]);
+  });
+
+  // connector dots and rails
+  const nodeGeom = new THREE.SphereGeometry(0.05, 18, 18);
+  const nodePositions: [number, number, number][] = [
+    [-0.88, 0.58, 0.28],
+    [0.86, 0.54, 0.22],
+    [-0.93, -0.55, 0.16],
+    [0.96, -0.48, 0.2],
+  ];
+
+  nodePositions.forEach((pos, idx) => {
+    const dot = new THREE.Mesh(
+      nodeGeom,
+      new THREE.MeshBasicMaterial({
+        color: idx % 2 === 0 ? "#8b5cf6" : "#2dd4bf",
+        transparent: true,
+        opacity: 0.95,
+      }),
+    );
+    dot.position.set(...pos);
+    accentGroup.add(dot);
+
+    panelEntries.push({
+      mesh: dot,
+      basePosition: dot.position.clone(),
+      baseRotation: dot.rotation.clone(),
+      baseScale: dot.scale.clone(),
+      phase: idx * 0.8,
+      speed: 1.4,
+      amplitude: 0.04,
+      active: false,
+    });
+  });
+
+  const connectorMat = new THREE.MeshBasicMaterial({
+    color: "#c4b5fd",
+    transparent: true,
+    opacity: 0.22,
+  });
+
+  const connectors: Array<
+    [[number, number, number], [number, number, number]]
+  > = [
+    [
+      [-0.58, 0.34, 0.1],
+      [-0.88, 0.58, 0.28],
+    ],
+    [
+      [0.6, 0.28, 0.14],
+      [0.86, 0.54, 0.22],
+    ],
+    [
+      [-0.52, -0.22, 0.12],
+      [-0.93, -0.55, 0.16],
+    ],
+    [
+      [0.56, -0.18, 0.14],
+      [0.96, -0.48, 0.2],
+    ],
+  ];
+
+  connectors.forEach(([start, end]) => {
+    const from = new THREE.Vector3(...start);
+    const to = new THREE.Vector3(...end);
+    const diff = to.clone().sub(from);
+    const len = diff.length();
+    const rail = new THREE.Mesh(
+      new THREE.BoxGeometry(0.018, len, 0.018),
+      connectorMat,
+    );
+    rail.position.copy(from.clone().add(to).multiplyScalar(0.5));
+    rail.quaternion.setFromUnitVectors(
+      new THREE.Vector3(0, 1, 0),
+      diff.normalize(),
+    );
+    accentGroup.add(rail);
+  });
+
+  const mouseEntries = panelEntries.filter(
+    (entry) => entry.mesh.parent === orbitGroup,
+  );
+
+  document.addEventListener("pointermove", (event) => {
+    mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+    mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+  });
+
+  window.addEventListener("pointerdown", () => {
+    raycaster.setFromCamera(mouse, camera);
+    const intersect = raycaster.intersectObjects(orbitGroup.children, true)[0];
+
+    if (!intersect) return;
+
+    const panel = mouseEntries.find(
+      (entry) =>
+        entry.mesh === intersect.object ||
+        entry.mesh.children.includes(intersect.object as THREE.Object3D),
+    );
+
+    if (!panel) return;
+
+    panel.active = !panel.active;
+
+    gsap.to(panel.mesh.position, {
+      duration: 0.45,
+      x:
+        panel.basePosition.x + (panel.active ? panel.basePosition.x * 0.08 : 0),
+      y:
+        panel.basePosition.y + (panel.active ? panel.basePosition.y * 0.08 : 0),
+      z: panel.basePosition.z + (panel.active ? 0.12 : 0),
+      ease: "power2.out",
+    });
+
+    gsap.to(panel.mesh.rotation, {
+      duration: 0.45,
+      x: panel.baseRotation.x + (panel.active ? 0.08 : 0),
+      y: panel.baseRotation.y + (panel.active ? 0.1 : 0),
+      z: panel.baseRotation.z + (panel.active ? 0.05 : 0),
+      ease: "power2.out",
+    });
+
+    gsap.to(panel.mesh.scale, {
+      duration: 0.45,
+      x: panel.baseScale.x * (panel.active ? 1.08 : 1),
+      y: panel.baseScale.y * (panel.active ? 1.08 : 1),
+      z: panel.baseScale.z * (panel.active ? 1.08 : 1),
+      ease: "power2.out",
+    });
+  });
+
+  window.scrollVelocity = 0;
+  window.scrollDirection = 1;
+  window.scrollCurrent = 0;
+  window.scrollStickyOffsets = window.scrollStickyOffsets || [];
+
+  let smoothVel = 0;
+  let pixelToUnit = -frustumSize / window.innerHeight;
+  let isPlaced = true;
+
+  ballGroup.scale.setScalar(0);
+
+  function animate(t: number) {
+    const time = t * 0.001;
+    globals.uTime.value = time;
+
+    const vel = isPlaced ? 0 : window.scrollVelocity;
+    const abs = Math.abs(vel);
+    const dir = window.scrollDirection;
+
+    smoothVel += (abs - smoothVel) * 0.06;
+    globals.uVel.value = smoothVel;
+    camera.position.y = window.scrollCurrent * pixelToUnit;
+
+    coreGroup.rotation.y =
+      Math.sin(time * 0.7) * 0.16 + smoothVel * 0.0025 * dir;
+    coreGroup.rotation.x = Math.cos(time * 0.5) * 0.08;
+    coreGroup.rotation.z = Math.sin(time * 0.35) * 0.05;
+
+    orbitGroup.rotation.y += (0.003 + abs * 0.0007) * dir;
+    orbitGroup.rotation.x += (0.0015 + abs * 0.0004) * -dir;
+    accentGroup.rotation.y = orbitGroup.rotation.y * 0.65;
+
+    panelEntries.forEach((entry, idx) => {
+      if (entry.amplitude <= 0) return;
+
+      const drift =
+        Math.sin(time * entry.speed + entry.phase) * entry.amplitude;
+      const sway =
+        Math.cos(time * (entry.speed * 0.85) + entry.phase) *
+        entry.amplitude *
+        0.6;
+
+      if (!entry.active) {
+        entry.mesh.position.x = entry.basePosition.x + sway;
+        entry.mesh.position.y = entry.basePosition.y + drift;
+        entry.mesh.position.z =
+          entry.basePosition.z +
+          Math.sin(time * (entry.speed * 1.1) + idx) * entry.amplitude * 0.5;
+        entry.mesh.rotation.x = entry.baseRotation.x + drift * 0.18;
+        entry.mesh.rotation.y = entry.baseRotation.y + sway * 0.18;
+      }
+    });
+
+    renderer.render(scene, camera);
+  }
+  gsap.ticker.fps(60);
+  gsap.ticker.add(animate);
+
+  function animateIn() {
+    const intro = { scale: 0, offsetY: 0.35 };
+
+    orbitGroup.children.forEach((child) => {
+      const mesh = child as THREE.Mesh;
+      const material = mesh.material as THREE.Material | THREE.Material[];
+      if (Array.isArray(material)) {
+        material.forEach((mat) => {
+          if ("opacity" in mat) mat.opacity = 0;
+        });
+      } else if (material && "opacity" in material) {
+        material.opacity = 0;
+      }
+    });
+
+    gsap.to(intro, {
+      scale: 1,
+      offsetY: 0,
+      duration: 0.95,
+      ease: "elastic.out(1, 0.7)",
+      onUpdate() {
+        ballGroup.scale.setScalar(intro.scale);
+        ballGroup.position.y = intro.offsetY;
+      },
+    });
+
+    orbitGroup.children.forEach((child, idx) => {
+      const mesh = child as THREE.Mesh;
+      const material = mesh.material as THREE.Material | THREE.Material[];
+      const target = child.position.clone();
+
+      gsap.fromTo(
+        child.position,
+        {
+          x: target.x * 0.7,
+          y: target.y * 0.7,
+          z: target.z - 0.25,
+        },
+        {
+          x: target.x,
+          y: target.y,
+          z: target.z,
+          duration: 0.72,
+          delay: idx * 0.04,
+          ease: "power3.out",
+        },
+      );
+
+      if (Array.isArray(material)) {
+        material.forEach((mat) => {
+          if ("opacity" in mat) {
+            gsap.to(mat, {
+              opacity: 1,
+              duration: 0.45,
+              delay: idx * 0.04,
+            });
+          }
+        });
+      } else if (material && "opacity" in material) {
+        gsap.to(material, {
+          opacity: 1,
+          duration: 0.45,
+          delay: idx * 0.04,
+        });
+      }
+    });
+  }
+
+  setTimeout(animateIn, 160);
+
+  class SyGL extends HTMLElement {
+    height = 0;
+    width = 0;
+    tl: ReturnType<typeof gsap.timeline> | null = null;
+
+    connectedCallback() {
+      const placeholders = Array.from(
+        document.querySelectorAll<HTMLElement>("[data-gl-place]"),
+      );
+
+      const getPosData = (el: HTMLElement) => {
+        if (!positions.has(el)) {
+          const { top: _top, left, width, height } = el.getBoundingClientRect();
+          const top = _top + window.scrollY;
+
+          const centerX = left + width / 2;
+          const centerY = top + height / 2;
+
+          const pixelToUnitX = (frustumSize * aspect) / this.width;
+          const pixelToUnitY = frustumSize / this.height;
+
+          const factor = parseFloat(
+            el.getAttribute("data-gl-place-factor") || "1",
+          );
+
+          const sticky = el.hasAttribute("data-gl-place-sticky");
+
+          positions.set(el, {
+            x: (centerX - this.width / 2) * pixelToUnitX,
+            y: -(centerY - this.height / 2) * pixelToUnitY,
+            scale: width * pixelToUnitX * 0.5,
+            factor,
+            sticky,
+          });
+        }
+
+        return positions.get(el);
+      };
+
+      let positions = new WeakMap();
+
+      const tl = gsap.timeline({
+        defaults: {
+          ease: "none",
+        },
+        scrollTrigger: {
+          trigger: this,
+          scrub: true,
+          invalidateOnRefresh: true,
+          fastScrollEnd: true,
+          onRefresh: () => {
+            positions = new WeakMap();
+            setFirst();
+          },
+          start: () => `${Math.round(window.innerHeight / 2)}px center`,
+          end: () => {
+            const last =
+              placeholders[placeholders.length - 1].getBoundingClientRect();
+            return `+=${Math.round(last.top + window.scrollY)}px bottom`;
+          },
+        },
+      });
+
+      const setFirst = () => {
+        const first = placeholders[0];
+        const data = getPosData(first);
+        ballGroup.position.x = data.x;
+        ballGroup.position.y = data.y;
+        ballGroup.scale.setScalar(data.scale);
+      };
+
+      tl.add(() => {
+        setFirst();
+      });
+
+      placeholders.forEach((hldr, i) => {
+        const prev = placeholders[i - 1];
+
+        if (!prev) return;
+
+        const duration = () => {
+          const p = getPosData(prev);
+          const h = getPosData(hldr);
+          const diffY = p.y - h.y;
+          const dist = Math.round(Math.sqrt(diffY * diffY) * 10);
+          return dist * p.factor;
+        };
+
+        tl.to(ballGroup.position, {
+          duration,
+          x: () => getPosData(hldr).x,
+          y: () => getPosData(hldr).y,
+        });
+
+        tl.to(
+          ballGroup.scale,
+          {
+            duration,
+            x: () => getPosData(hldr).scale,
+            y: () => getPosData(hldr).scale,
+            z: () => getPosData(hldr).scale,
+            onUpdate() {
+              const prg = this.progress();
+
+              if (prg === 0 || prg === 1) {
+                isPlaced = true;
+              } else if (isPlaced) {
+                isPlaced = false;
+              }
+            },
+          },
+          "<",
+        );
+      });
+
+      this.tl = tl;
+
+      const resizeObserver = new ResizeObserver(() => {
+        tl.scrollTrigger?.refresh();
+      });
+      resizeObserver.observe(document.body);
+    }
+
+    constructor() {
+      super();
+
+      addResizeObserver(this);
+      this.onResize();
+    }
+
+    onResize = () => {
+      const width = window.innerWidth;
+      const height = window.innerHeight;
+
+      this.width = width;
+      this.height = height;
+
+      pixelToUnit = -frustumSize / height;
+
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+      renderer.setSize(width, height);
+
+      aspect = width / height;
+      camera.left = (-frustumSize * aspect) / 2;
+      camera.right = (frustumSize * aspect) / 2;
+      camera.top = frustumSize / 2;
+      camera.bottom = -frustumSize / 2;
+      camera.updateProjectionMatrix();
+
+      this.tl?.scrollTrigger?.refresh();
+    };
+
+    getTotalStickyOffset(scrollY: number): [number, number] {
+      let cameraOffset = 0;
+      let sceneOffset = 0;
+
+      window.scrollStickyOffsets.forEach(([start, end, current]) => {
+        if (scrollY < start) {
+          return;
+        } else if (scrollY >= start && scrollY <= end) {
+          cameraOffset += current;
+          sceneOffset -= current;
+        } else {
+          cameraOffset = current;
+        }
+      });
+
+      return [cameraOffset, sceneOffset];
+    }
+  }
+
+  customElements.define("sy-gl", SyGL);
+</script>
+
+<style>
+  sy-gl {
+    position: fixed;
+    z-index: 8;
+    pointer-events: none;
+    top: 0;
+    left: 0;
+  }
+</style>

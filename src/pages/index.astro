@@ -11,7 +11,7 @@ import Statements from "../components/Statements.astro";
 import Introducing from "../components/Introducing.astro";
 import GL from "../components/GL.astro";
 import GLPlaces from "../components/GlPlaces.astro";
-
+import GLProjectCore from "../components/GL_project_core.astro";
 import logo1 from "../assets/logoipsum-344.svg";
 import logo2 from "../assets/logoipsum-350.svg";
 import logo3 from "../assets/logoipsum-345.svg";
@@ -24,89 +24,84 @@ import logo8 from "../assets/logoipsum-331.svg";
 
 <Layout title="Home">
   <HeroHome
-    title="Build Faster. Launch Smarter."
-    subtitle="Everything you need to design, manage, and ship high-quality projects without friction, guesswork, or wasted time."
+    title="Your Projects. One Home."
+    subtitle="A desktop app that turns your local coding projects into a clean, organized library. Browse projects, track time, view README and git activity, favorite the ones that matter, and jump back into coding instantly."
     cta={{
-      title: "Get Started",
-      url: "#",
+      title: "Download",
+      url: "/download",
     }}
   />
 
   <Introducing
-    title="A platform designed to turn ideas into impact"
-    text="From first concept to final delivery, our tools streamline collaboration, eliminate bottlenecks, and keep your team focused on what matters most: results. Simple to adopt, powerful at scale."
-    cta={{
-      title: "Get Started",
-      url: "#",
-    }}
+    title="A better way to manage your coding projects"
+    text="This desktop app gives developers one place to organize, revisit, and track their local projects. Instead of digging through folders, editor history, or old repositories, you get a clean library where every project feels visible, structured, and easy to return to."
   />
 
   <StepsTimeline
     title="How it works"
     items={[
       {
-        title: "Set up in minutes",
-        text: "Create your workspace, invite your team, and configure projects effortlessly—no complex onboarding or technical setup required.",
+        title: "Download and install the app",
+        text: "Install the desktop app on your PC and launch it. Windows may show a security prompt during installation since the app is independently distributed, but once installed, you're ready to start building your library.",
       },
       {
-        title: "Collaborate without friction",
-        text: "Centralize communication, assets, and tasks in one place so everyone stays aligned and productive.",
+        title: "Scan your projects",
+        text: "Run an initial scan to detect your local projects and automatically populate your library. Your projects are gathered into one place so you can browse them without digging through folders.",
       },
       {
-        title: "Deliver measurable results",
-        text: "Track progress in real time, optimize workflows, and ship projects faster with complete visibility.",
+        title: "Organize and jump back in",
+        text: "Favorite important projects, group them your way, view README and git activity, track time spent, and open any project instantly in your preferred code editor.",
       },
     ]}
   />
-
   <GalleryText
-    title="Designed for teams that value clarity and speed"
-    text="A clean interface, powerful features, and thoughtful details come together to help your team move faster—without sacrificing quality."
+    title="A cleaner way to manage your coding projects"
+    text="Keep your local projects in one organized desktop library. Browse them from a sidebar, reopen work instantly, track time spent, and explore README content and git activity from one focused view."
     cta={{
-      title: "Try It Today",
-      url: "#",
+      title: "Download the App",
+      url: "/download",
     }}
     images={[
       {
-        alt: "Dashboard overview",
+        alt: "Project library sidebar with favorite coding projects",
         src: "/image-1.jpg",
         width: 6000,
         height: 4000,
       },
       {
-        alt: "Project collaboration view",
+        alt: "Selected project view showing README, tracked time, and project details",
         src: "/image-2.jpg",
         width: 2689,
         height: 4032,
       },
       {
-        alt: "Analytics and reporting",
+        alt: "Git activity view with commits, changed files, and diffs",
         src: "/image-3.jpg",
         width: 3734,
         height: 5359,
       },
     ]}
     marqueeTexts={[
-      "Creative Firepower",
-      "Built for Speed",
-      "Trusted by Professionals",
-      "Simple, Transparent Pricing",
+      "Local Project Library",
+      "Tracked Time",
+      "README and Git Activity",
+      "Launch in One Click",
     ]}
   />
 
   <Statements
     items={[
       {
-        title: "For modern teams",
-        text: "Every feature is designed to reduce complexity and maximize execution speed.",
+        title: "All your projects, one place",
+        text: "Bring scattered local projects into a single library that is easier to browse, manage, and return to.",
       },
       {
-        title: "Scales as you grow",
-        text: "Whether you’re a solo creator or a global team, the platform adapts to your workflow.",
+        title: "See progress, not just files",
+        text: "Track time spent, read project documentation, and explore git activity from one clear project view.",
       },
       {
-        title: "Real outcomes",
-        text: "Less busywork, more progress—so you can deliver meaningful results consistently.",
+        title: "Jump back into work faster",
+        text: "Favorite important projects, group them your way, and launch directly into your preferred code editor.",
       },
     ]}
   />
@@ -114,53 +109,10 @@ import logo8 from "../assets/logoipsum-331.svg";
   <TextMarquee
     class="marquee"
     texts={[
-      "Creative Firepower",
-      "Built for Speed",
-      "Trusted by Professionals",
-      "Simple, Transparent Pricing",
-    ]}
-  />
-
-  <Plans
-    title="Plans & Pricing"
-    subtitle="Start for free, upgrade when you’re ready. No hidden fees, no long-term commitments."
-    items={[
-      {
-        title: "Free Plan",
-        price: {
-          amount: "$0",
-          duration: "month",
-        },
-        link: {
-          title: "Get Started Free",
-          url: "#",
-        },
-        features: [
-          { title: "Up to 50 accounts" },
-          { title: "Unlimited projects" },
-          { title: "Chat support", disabled: true },
-          { title: "Email support", disabled: true },
-          { title: "Custom onboarding", disabled: true },
-        ],
-      },
-      {
-        title: "Premium Plan",
-        price: {
-          amount: "$20",
-          duration: "month",
-        },
-        link: {
-          title: "Start 14-Day Trial",
-          url: "#",
-        },
-        features: [
-          { title: "Up to 50 accounts" },
-          { title: "Unlimited projects" },
-          { title: "Priority chat support" },
-          { title: "Email support" },
-          { title: "Custom onboarding assistance" },
-        ],
-      },
+      "Local Project Library",
+      "Tracked Time",
+      "README and Git Activity",
+      "Launch in One Click",
     ]}
   />
 
@@ -170,29 +122,44 @@ import logo8 from "../assets/logoipsum-331.svg";
     subtitle="Quick answers to the most common questions."
     items={[
       {
-        question: "Who is this platform for?",
+        question: "What is this software?",
         answer:
-          "It’s built for creators, startups, agencies, and teams who want to move faster without sacrificing quality or control.",
+          "It’s a desktop app that turns your coding projects into a personal library. You can browse local projects, favorite and group them, track time spent, read project README files, inspect git activity, and launch projects directly in your preferred code editor.",
       },
       {
-        question: "Can I upgrade or downgrade at any time?",
+        question: "Who is it for?",
         answer:
-          "Yes. You can change plans whenever you need, with no penalties or long-term contracts.",
+          "It’s made for developers, hobby developers, students, and anyone with multiple coding projects spread across folders, repositories, or editor history who wants a cleaner way to manage them.",
       },
       {
-        question: "Does the free plan really cost nothing?",
+        question: "Is it really free?",
         answer:
-          "Absolutely. The free plan gives you full access to core features so you can evaluate the platform with confidence.",
+          "Yes. The app is free to use. There are no subscriptions or paid plans. If you enjoy it and want to support development, donations are completely optional.",
       },
       {
-        question: "Is my data secure?",
+        question: "Does it upload my code or project data?",
         answer:
-          "Yes. We use industry-standard security practices to protect your data and ensure reliability.",
+          "No. The app works locally on your computer and does not upload your projects or files anywhere. Everything stays offline, except when you choose to interact with GitHub features such as browsing or cloning repositories.",
       },
       {
-        question: "Do you offer support during onboarding?",
+        question: "Do I need Git to use it?",
         answer:
-          "Premium users receive guided onboarding and priority support to ensure a smooth start.",
+          "No. You can use the app without Git to organize, manage, and launch your projects. Git-enabled projects simply show extra details like commits, changed files, and diffs.",
+      },
+      {
+        question: "Why might Windows show a warning during installation?",
+        answer:
+          "Because the app is independently distributed, Windows may show a security prompt during installation. This is common with newer desktop apps that are not yet widely recognized.",
+      },
+      {
+        question: "Can I use it with GitHub repositories?",
+        answer:
+          "Yes. You can browse public repositories and your own private repositories through GitHub, then clone them directly to your local machine. Outside of those requests, the app stays fully local.",
+      },
+      {
+        question: "Can I choose which editor opens my project?",
+        answer:
+          "Yes. The app lets you launch projects in your preferred code editor so you can jump back into work quickly.",
       },
     ]}
   />
@@ -234,8 +201,9 @@ import logo8 from "../assets/logoipsum-331.svg";
     ]}
   />
 
-  <GL />
+  <!-- <GL /> -->
   <GLPlaces />
+  <GLProjectCore />
 </Layout>
 
 <style>
