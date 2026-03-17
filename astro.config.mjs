@@ -1,13 +1,10 @@
 // @ts-check
-import {
-  defineConfig,
-  fontProviders,
-} from "astro/config";
+import { defineConfig, fontProviders } from "astro/config";
 
-
-// https://astro.build/config
 export default defineConfig({
-  scopedStyleStrategy: 'where',
+  site: "https://chripeed.github.io",
+
+  scopedStyleStrategy: "where",
   experimental: {
     fonts: [
       {
